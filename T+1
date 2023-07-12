@@ -1,0 +1,80 @@
+Sub FilterAndSendData()
+    Dim wsData As Worksheet
+    Dim wsFiltered As Worksheet
+    Dim OutlookApp As Object
+    Dim MailItem As Object
+    Dim rngData As Range
+    Dim rngFiltered As Range
+    Dim lastRow As Long
+    Dim emailBody As String
+    
+    ' データが格納されているシートを取得
+    Set wsData = ThisWorkbook.Sheets("Sheet1")
+    
+    ' 新しいシートを作成して絞り込んだデータを書き込む
+    Set wsFiltered = ThisWorkbook.Sheets.Add(After:=wsData)
+    wsFiltered.Name = "絞り込まれたデータ"
+    
+    ' 全データをR列が空白ではない行に絞り込む
+    lastRow = wsData.Cells(wsData.Rows.Count, "R").End(xlUp).Row
+    Set rngData = wsData.Range("A1:R" & lastRow)
+    rngData.AutoFilter Field:=18, Criteria1:="<>"
+    
+    ' 絞り込んだデータを新しいシートに書き込む
+    rngData.SpecialCells(xlCellTypeVisible).Copy wsFiltered.Cells(1, 1)
+    
+    ' "Q"が含まれる行を削除する(UとOの行だけを残す)
+    lastRow = wsFiltered.Cells(wsFiltered.Rows.Count, "B").End(xlUp).Row
+    Set rngData = wsFiltered.Range("B1:B" & lastRow)
+    rngData.AutoFilter Field:=1, Criteria1:="Q"
+    rngData.Offset(1).SpecialCells(xlCellTypeVisible).EntireRow.Delete
+    
+    ' E, J, K, N列を削除する（不要な列の削除）
+    wsFiltered.Columns("E").Delete
+    wsFiltered.Columns("J").Delete
+    wsFiltered.Columns("K").Delete
+    wsFiltered.Columns("N").Delete
+    
+    ' Outlookアプリケーションを起動
+    Set OutlookApp = CreateObject("Outlook.Application")
+    Set MailItem = OutlookApp.CreateItem(0)
+    
+    ' メール本文を作成
+    emailBody = "<html><body>"
+    emailBody = emailBody & "<p>以下は絞り込まれたデータです:</p>"
+    emailBody = emailBody & "<table style=""border-collapse: collapse; border: 1px solid black;"">"
+    emailBody = emailBody & "<tr>"
+    For Each headerCell In wsFiltered.UsedRange.Rows(1).Cells
+        emailBody = emailBody & "<th style=""border: 1px solid black; padding: 5px;"">" & headerCell.Value & "</th>"
+    Next headerCell
+    emailBody = emailBody & "</tr>"
+    For Each dataRow In wsFiltered.UsedRange.Rows
+        If dataRow.Row > 1 Then
+            emailBody = emailBody & "<tr>"
+            For Each dataCell In dataRow.Cells
+                emailBody = emailBody & "<td style=""border: 1px solid black; padding: 5px;"">" & dataCell.Value & "</td>"
+            Next dataCell
+            emailBody = emailBody & "</tr>"
+        End If
+    Next dataRow
+    emailBody = emailBody & "</table>"
+    emailBody = emailBody & "</body></html>"
+    
+    ' メールの設定
+    With MailItem
+        .To = "example.gmail.com"
+        .CC = "example2.gmail.com"
+        .Subject = "データの転記と送信"
+        .HTMLBody = emailBody
+        .Display ' 送信せずにメールを表示
+    End With
+    
+    ' メモリ解放
+    Set MailItem = Nothing
+    Set OutlookApp = Nothing
+    
+    ' オートフィルターを解除
+    wsData.AutoFilterMode = False
+    wsFiltered.AutoFilterMode = False
+End Sub
+
